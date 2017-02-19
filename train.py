@@ -8,7 +8,7 @@ parser.add_argument('-w', '--num-workers', default=1, type=int,
 parser.add_argument('-r', '--remotes', default=None,
                     help='The address of pre-existing VNC servers and '
                          'rewarders to use (e.g. -r vnc://localhost:5900+15900,vnc://localhost:5901+15901).')
-parser.add_argument('-e', '--env-id', type=str, default="PongDeterministic-v3",
+parser.add_argument('-e', '--env-id', nargs='+', type=str, default="PongDeterministic-v3",
                     help="Environment id")
 parser.add_argument('-l', '--log-dir', type=str, default="/tmp/pong",
                     help="Log directory path")
@@ -22,10 +22,10 @@ def new_tmux_cmd(name, cmd):
 
 def create_tmux_commands(session, num_workers, remotes, env_id, logdir):
     # for launching the TF workers and for launching tensorboard
-    base_cmd = [
+    base_cmd = [[
         'CUDA_VISIBLE_DEVICES=', sys.executable, 'worker.py',
-        '--log-dir', logdir, '--env-id', env_id,
-        '--num-workers', str(num_workers)]
+        '--log-dir', logdir, '--env-id', env_id[i],
+        '--num-workers', str(num_workers)] for i in range(len(env_id))]
 
     if remotes is None:
         remotes = ["1"] * num_workers
@@ -33,10 +33,10 @@ def create_tmux_commands(session, num_workers, remotes, env_id, logdir):
         remotes = remotes.split(',')
         assert len(remotes) == num_workers
 
-    cmds_map = [new_tmux_cmd("ps", base_cmd + ["--job-name", "ps"])]
+    cmds_map = [new_tmux_cmd("ps", base_cmd[0] + ["--job-name", "ps"])] 
     for i in range(num_workers):
         cmds_map += [new_tmux_cmd(
-            "w-%d" % i, base_cmd + ["--job-name", "worker", "--task", str(i), "--remotes", remotes[i]])]
+            "w-%d" % i, base_cmd[i] + ["--job-name", "worker", "--task", str(i), "--remotes", remotes[i]])]
 
     cmds_map += [new_tmux_cmd("tb", ["tensorboard --logdir {} --port 12345".format(logdir)])]
     cmds_map += [new_tmux_cmd("htop", ["htop"])]
